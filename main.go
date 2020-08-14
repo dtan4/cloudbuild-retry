@@ -1,8 +1,12 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+
+	"google.golang.org/api/cloudbuild/v1"
 )
 
 const (
@@ -19,6 +23,34 @@ func run(args []string) int {
 
 	fmt.Printf("project: %s\n", projectID)
 	fmt.Printf("build: %s\n", buildID)
+
+	ctx := context.Background()
+	cloudbuildService, err := cloudbuild.NewService(ctx)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
+	}
+
+	op, err := cloudbuildService.Projects.Builds.Retry(projectID, buildID, &cloudbuild.RetryBuildRequest{}).Do()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
+	}
+
+	b, err := op.Metadata.MarshalJSON()
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
+	}
+
+	var m cloudbuild.BuildOperationMetadata
+
+	if err := json.Unmarshal(b, &m); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitError
+	}
+
+	fmt.Printf("new build: %s\n", m.Build.Id)
 
 	return exitOK
 }
